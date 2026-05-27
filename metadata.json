@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Rifas Online",
+  "description": "Plataforma de rifas coordinadas con vendedores, transferencia bancaria y panel de administración.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
