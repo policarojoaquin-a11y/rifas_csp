@@ -376,6 +376,26 @@ export default function BuyerView({
         )}
       </section>
 
+      {/* Bases del Sorteo Alert */}
+      <div className="mb-8 rounded-2xl border border-sky-100 bg-sky-50/40 p-5 sm:p-6 shadow-xs leading-relaxed">
+        <div className="flex gap-4 items-start">
+          <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-xl bg-sky-100/80 text-sky-700">
+            <Info className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-slate-900 mb-1.5">
+              Bases y Condiciones del Sorteo
+            </h4>
+            <p className="text-xs sm:text-sm text-slate-605 text-slate-600 font-medium leading-relaxed">
+              El sorteo se realizará el día <strong className="text-slate-950 font-bold">Lunes 6 de Julio</strong> por la <strong className="text-slate-950 font-bold">Quiniela Nacional Nocturna</strong>, tomando las últimas 4 cifras del 1° al 12° premio. En caso de que el número sorteado no haya sido vendido, se tomará el siguiente premio en orden. En caso de no realizarse el sorteo ese día, se pasará al próximo sorteo de la Quiniela Nacional. Los premios no son transferibles ni canjeables por dinero.
+            </p>
+            <p className="mt-2 text-xs sm:text-sm font-bold text-sky-700 flex items-center gap-1">
+              ¡Gracias por colaborar! 🙌
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Step 1 & 2: Main Selectors (Col 1-7) */}
         <div className="space-y-8 lg:col-span-7">
