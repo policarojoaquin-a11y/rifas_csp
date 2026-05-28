@@ -657,10 +657,10 @@ export const supabaseService = {
     if (groupedSales) {
       for (const sale of groupedSales) {
         if (sale.rifa_id) {
-          // Reset availability in rifas table
+          // Reset availability in rifas table without clearing the assigned seller
           await supabase
             .from('rifas')
-            .update({ is_available: true, vendedor_id: null })
+            .update({ is_available: true })
             .eq('id', sale.rifa_id);
         }
 
