@@ -294,7 +294,7 @@ export default function App() {
       <footer className="border-t border-slate-200/50 bg-white py-6 text-center text-xs text-slate-400">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-2">
           <p className="font-semibold text-slate-500">
-            © 2026 Plataforma de Rifas Online Autogestionada.
+            © 2027 Plataforma de Rifas Online Autogestionada.
           </p>
           <p className="flex items-center justify-center gap-1">
             Compatible con almacenamiento local persistente e interactividad en tiempo real.

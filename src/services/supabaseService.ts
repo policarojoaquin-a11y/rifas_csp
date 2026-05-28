@@ -73,7 +73,7 @@ export const supabaseService = {
     return {
       id: 'default-raffle',
       title: 'Rifa Gira de Rugby a Sudáfrica - Club San Patricio',
-      description: 'Participá de la rifa benéfica oficial del Club San Patricio. Todo lo recaudado será destinado a financiar la gira de rugby a Sudáfrica 2026.',
+      description: 'Participá de la rifa benéfica oficial del Club San Patricio. Todo lo recaudado será destinado a financiar la gira de rugby a Sudáfrica 2027.',
       ticketPrice: 15000,
       totalTickets: totalTicketsCount,
       bankInfo: DEFAULT_BANK_INFO,
@@ -318,7 +318,7 @@ export const supabaseService = {
       let buyerName = sale ? sale.nombre : null;
       let buyerPhone = sale ? sale.numero : null;
       let buyerEmail = sale ? sale.email : null;
-      let receiptUrl = null;
+      let receiptUrl = sale ? (sale.comprobante || sale.receipt_url || null) : null;
       let submittedAt = sale ? sale.fecha_venta : null;
 
       if (localOverlay) {
@@ -445,21 +445,49 @@ export const supabaseService = {
 
         if (updateError) throw updateError;
 
-        // 2. Insert sale item
-        const { error: insertError } = await supabase
-          .from('rifas_vendidas')
-          .insert({
-            id: crypto.randomUUID ? crypto.randomUUID() : `sale-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            rifa_id: match.id,
-            vendedor_id: isNaN(sId) ? null : sId,
-            nombre: data.buyerName,
-            numero: data.buyerPhone,
-            email: data.buyerEmail,
-            fecha_venta: submittedAt,
-            state: 'PENDING_REVIEW',
-          });
+        // 2. Insert sale item with robust fallback in case column 'comprobante' doesn't exist yet
+        let insertError: any = null;
+        try {
+          const { error } = await supabase
+            .from('rifas_vendidas')
+            .insert({
+              id: crypto.randomUUID ? crypto.randomUUID() : `sale-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              rifa_id: match.id,
+              vendedor_id: isNaN(sId) ? null : sId,
+              nombre: data.buyerName,
+              numero: data.buyerPhone,
+              email: data.buyerEmail,
+              fecha_venta: submittedAt,
+              state: 'PENDING_REVIEW',
+              comprobante: data.receiptUrl, // Base64 proof of transfer
+            });
+          insertError = error;
+        } catch (err) {
+          insertError = err;
+        }
 
-        if (insertError) throw insertError;
+        // Catch missing column error and fallback to insert without comprobante
+        if (insertError) {
+          const errMsg = insertError.message || String(insertError);
+          if (errMsg.includes('comprobante') || errMsg.includes('column') || errMsg.includes('does not exist')) {
+            console.warn('The "comprobante" column might be missing. Attempting fallback insert without image. Please run the ALTER TABLE SQL in the admin panel settings!');
+            const { error: fallbackError } = await supabase
+              .from('rifas_vendidas')
+              .insert({
+                id: crypto.randomUUID ? crypto.randomUUID() : `sale-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                rifa_id: match.id,
+                vendedor_id: isNaN(sId) ? null : sId,
+                nombre: data.buyerName,
+                numero: data.buyerPhone,
+                email: data.buyerEmail,
+                fecha_venta: submittedAt,
+                state: 'PENDING_REVIEW',
+              });
+            if (fallbackError) throw fallbackError;
+          } else {
+            throw insertError;
+          }
+        }
       }
     }
 
@@ -521,6 +549,7 @@ export const supabaseService = {
       fecha_venta: string;
       state: string;
       ticketNumbers: number[];
+      receiptUrl: string;
     }> = {};
 
     (sales || []).forEach(row => {
@@ -540,10 +569,14 @@ export const supabaseService = {
           fecha_venta: dateStr,
           state: row.state || 'PENDING_REVIEW',
           ticketNumbers: isNaN(ticketNum) ? [] : [ticketNum],
+          receiptUrl: row.comprobante || row.receipt_url || '',
         };
       } else {
         if (!isNaN(ticketNum)) {
           groups[key].ticketNumbers.push(ticketNum);
+        }
+        if (!groups[key].receiptUrl && (row.comprobante || row.receipt_url)) {
+          groups[key].receiptUrl = row.comprobante || row.receipt_url;
         }
       }
     });
@@ -552,8 +585,8 @@ export const supabaseService = {
       // Find voucher/receipt uploaded Base64 image from browser cache if it was submitted in this browser session
       const firstTicketNum = g.ticketNumbers[0];
       const localOverlay = typeof localStorage !== 'undefined' ? localStorage.getItem(`rifa_buyer_info_${firstTicketNum}`) : null;
-      let receiptUrl = '';
-      if (localOverlay) {
+      let receiptUrl = g.receiptUrl || '';
+      if (!receiptUrl && localOverlay) {
         try {
           const parsed = JSON.parse(localOverlay);
           receiptUrl = parsed.receiptUrl || '';

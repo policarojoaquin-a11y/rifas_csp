@@ -18,6 +18,7 @@ import {
   Mail,
   Tag,
   RefreshCw,
+  ArrowLeft,
   Coins,
   DollarSign,
   Briefcase,
@@ -621,12 +622,12 @@ export default function AdminView({
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           
           {/* Purchase request sidebar items (Col 1-5) */}
-          <section className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs shadow-slate-100">
+          <section className={`lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 shadow-xs shadow-slate-100 ${selectedPurchase ? 'hidden lg:block' : 'block'}`}>
             <div className="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
               <h3 className="text-md font-bold text-slate-900">Solicitudes de Transferencia</h3>
               <select
                 value={purchaseFilter}
-                onChange={(e) => setPurchaseFilter(e.target.value as any)}
+                onChange={(e) => { setPurchaseFilter(e.target.value as any); setSelectedPurchase(null); }}
                 className="text-xs rounded-lg border border-slate-200 py-1 px-2 font-semibold text-slate-700 outline-none focus:border-slate-400 bg-slate-50"
               >
                 <option value="PENDING">Pendientes</option>
@@ -691,7 +692,7 @@ export default function AdminView({
           </section>
 
           {/* Details viewer (Col 6-12) */}
-          <section className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs shadow-slate-100 h-full">
+          <section className={`lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-6 shadow-xs shadow-slate-100 h-full ${selectedPurchase ? 'block' : 'hidden lg:block'}`}>
             {!selectedPurchase ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-center">
                 <Search className="h-10 w-10 text-slate-300 mb-2" />
@@ -699,6 +700,15 @@ export default function AdminView({
               </div>
             ) : (
               <div className="space-y-6">
+                {/* Back to list button on mobile */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPurchase(null)}
+                  className="lg:hidden flex items-center gap-2 text-xs font-bold text-sky-600 hover:text-sky-700 mb-4 cursor-pointer border border-sky-100 bg-sky-50 px-3 py-2 rounded-xl transition-colors shrink-0"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver a la lista de solicitudes
+                </button>
                 
                 {/* Visual state messages */}
                 {purchaseActionMessage && (
@@ -1472,6 +1482,19 @@ export default function AdminView({
                   Abre la sección de <strong>"SQL Editor"</strong> en el panel izquierdo de tu Supabase dashboard, haz clic en <strong>"New query"</strong>, pega el código que has copiado arriba, y haz clic en el botón verde <strong>"Run"</strong> para inicializar las tablas con datos sanos automáticamente.
                 </p>
 
+                <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3.5 text-xs space-y-1">
+                  <p className="font-extrabold flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4 text-amber-700 shrink-0" />
+                    ¿Ya tenías la base de datos creada?
+                  </p>
+                  <p className="leading-relaxed font-medium">
+                    Si ya habías configurado Supabase anteriormente, ejecuta esta consulta simple en tu SQL Editor para habilitar la visualización de los comprobantes cargados sin perder tus datos:
+                  </p>
+                  <code className="block bg-slate-900 text-amber-200 p-2 rounded-lg font-mono text-[10px] select-all mt-1">
+                    ALTER TABLE public.rifas_vendidas ADD COLUMN IF NOT EXISTS comprobante TEXT;
+                  </code>
+                </div>
+
                 {/* SQL Code Sandbox display box */}
                 <div className="mt-3 rounded-2xl bg-slate-950 text-slate-300 font-mono text-[10px] p-4 max-h-60 overflow-y-auto border border-slate-800 leading-normal select-all">
                   <pre className="whitespace-pre">{ESP_SUPABASE_SQL}</pre>
@@ -1522,6 +1545,7 @@ CREATE TABLE IF NOT EXISTS public.rifas_vendidas (
     email TEXT NOT NULL,
     fecha_venta TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     state TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+    comprobante TEXT, -- Imagen del comprobante en formato Base64 para visualización del Admin
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 

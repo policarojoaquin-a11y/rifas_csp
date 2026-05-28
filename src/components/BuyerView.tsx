@@ -46,18 +46,16 @@ import {
 import { Raffle, Seller, Ticket, TicketStatus } from '../types';
 
 const RAFFLE_PRIZES = [
-  'Heladera BGH CON DISPENSER',
-  'Smart tv 50" enova',
-  'Aire acondicionado philco split frio calor',
-  'CAVA PHILCO 28 BOTELLAS',
-  'Microondas Samsung 23 silver',
-  'CAFETERA ESPRESSO DAIHATSU CF2000',
-  'Parlante house of marley',
-  'CAMA ELASTICA CE30 3 MTS',
-  'Aspiradora daihatsu d-as 400',
-  'Freidora aire MIDEA 11 LTS',
-  'Monopatin electrico Daihatsu',
-  'Espumador de leche daihatsu'
+  'Heladera BGH con Dispenser',
+  'Smart TV 50" Enova',
+  'Microondas Samsung 23" Silver',
+  'Barra de Sonido Samsung',
+  'Minipimer Midea',
+  'Licuadora KitchenAid',
+  'Tostadora KitchenAid',
+  'Procesadora KitchenAid',
+  'Parlante XBoom LG',
+  'Termo K2 1 Litro'
 ];
 
 // Zod Validation Schema

@@ -43,7 +43,7 @@ const DEFAULT_BANK_INFO = {
 const DEFAULT_RAFFLE: Raffle = {
   id: 'raffle-1',
   title: 'Rifa Gira de Rugby a Sudáfrica - Club San Patricio',
-  description: 'Participá de la rifa benéfica oficial del Club San Patricio. Todo lo recaudado será destinado a financiar la gira de rugby a Sudáfrica 2026.',
+  description: 'Participá de la rifa benéfica oficial del Club San Patricio. Todo lo recaudado será destinado a financiar la gira de rugby a Sudáfrica 2027.',
   ticketPrice: 15000,
   totalTickets: 100, // 100 tickets in our pool for demonstration ease
   bankInfo: DEFAULT_BANK_INFO,
