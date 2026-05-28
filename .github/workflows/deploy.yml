@@ -1,51 +1,34 @@
-name: Deploy to Hostinger via FTP
+name: Deploy to Hostinger
 
 on:
   push:
     branches:
-      - main  # Se ejecutará cada vez que hagas push a la rama 'main'
+      - main # Cambia esto a master si tu rama principal se llama master
 
 jobs:
-  web-deploy:
-    name: 🎉 Compilar y Desplegar
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 🚚 Obtener el código actual
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🟢 Configurar Node.js (v20)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: 📦 Instalar dependencias
-        run: npm ci || npm install
+      - name: Install Dependencies
+        run: npm ci
 
-      - name: 🚀 Compilar el proyecto (React + Vite)
-        env:
-          # Aquí agregamos las variables de tu Supabase para que se inyecten durante la compilación
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Build Application
         run: npm run build
 
-      - name: 📂 Generar archivo .htaccess para rutas de React
-        run: |
-          echo '<IfModule mod_rewrite.c>
-            RewriteEngine On
-            RewriteBase /
-            RewriteRule ^index\.html$ - [L]
-            RewriteCond %{REQUEST_FILENAME} !-f
-            RewriteCond %{REQUEST_FILENAME} !-d
-            RewriteRule . /index.html [L]
-          </IfModule>' > dist/.htaccess
-
-      - name: 📤 Subir carpeta 'dist' a Hostinger por FTP
+      - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist/          # Sube el contenido compilado que entiende Hostinger
-          server-dir: /public_html/   # Destino en Hostinger (asegúrate de que sea tu ruta)
-          dangerous-clean-html: false # Evita borrar contenido previo de forma accidental
+          server-dir: public_html/ # Dirección destino en Hostinger (suele ser public_html/)
+          local-dir: ./dist/
