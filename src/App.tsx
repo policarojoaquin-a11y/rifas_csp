@@ -4,7 +4,6 @@ import { Raffle, Seller, Ticket, PurchaseRequest, BankInfo } from './types';
 import Header from './components/Header';
 import BuyerView from './components/BuyerView';
 import AdminView from './components/AdminView';
-import { Ticket as TicketIcon, Heart, RefreshCw } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 
 export default function App() {
