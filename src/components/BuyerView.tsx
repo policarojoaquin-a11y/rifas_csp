@@ -335,17 +335,19 @@ export default function BuyerView({
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {dbErrorMsg && (
-        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
-            <span><strong>Error de Base de Datos (Supabase):</strong> {dbErrorMsg}. El sistema ha activado el simulador local de contingencia.</span>
-          </div>
-          <button onClick={() => setDbErrorMsg(null)} className="text-rose-600 hover:text-rose-800 font-bold ml-2">Cerrar</button>
-        </div>
-      )}
 
-      {/* Raffle Info Banner */}
+
+      {/* Aviso de refrescar por disponibilidad */}
+      <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-xs sm:text-sm text-amber-900 shadow-sm flex items-start gap-3">
+        <span className="text-lg shrink-0 select-none">💡</span>
+        <div className="flex-1">
+          <p className="font-semibold text-amber-950">Aviso importante:</p>
+          <p className="text-amber-800 mt-0.5 leading-relaxed">
+            Si no te aparecen rifas disponibles a ningún vendedor, por favor <strong className="text-amber-950 font-bold">refresca la página</strong> para reconectar con el sistema de contingencia.
+          </p>
+        </div>
+      </div>
+
       <section className="relative mb-10 overflow-hidden rounded-3xl bg-radial from-slate-900 to-slate-800 px-6 py-10 text-white shadow-xl sm:px-12 sm:py-14">
         {/* Decorative graphic element */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 h-80 w-80 rounded-full bg-sky-600/15 blur-3xl" />
