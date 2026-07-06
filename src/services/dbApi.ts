@@ -82,9 +82,14 @@ export const dbApi = {
   async getSellers(): Promise<Seller[]> {
     if (activeEngine === 'SUPABASE_CONNECTED') {
       try {
-        return await supabaseService.getSellers();
-      } catch (err) {
-        console.warn('Supabase getSellers failed, falling back to mock:', err);
+        const res = await supabaseService.getSellers();
+        return res;
+      } catch (err: any) {
+        console.warn('Supabase getSellers failed, gracefully downgrading engine to MOCK_LOCAL:', err);
+        activeEngine = 'MOCK_LOCAL';
+        if (typeof window !== 'undefined') {
+          (window as any).__lastDbError = err;
+        }
       }
     }
     return mockApi.getSellers();
@@ -117,9 +122,14 @@ export const dbApi = {
   async getTickets(): Promise<Ticket[]> {
     if (activeEngine === 'SUPABASE_CONNECTED') {
       try {
-        return await supabaseService.getTickets();
-      } catch (err) {
-        console.warn('Supabase getTickets failed, falling back to mock:', err);
+        const res = await supabaseService.getTickets();
+        return res;
+      } catch (err: any) {
+        console.warn('Supabase getTickets failed, gracefully downgrading engine to MOCK_LOCAL:', err);
+        activeEngine = 'MOCK_LOCAL';
+        if (typeof window !== 'undefined') {
+          (window as any).__lastDbError = err;
+        }
       }
     }
     return mockApi.getTickets();
@@ -130,7 +140,8 @@ export const dbApi = {
       try {
         return await supabaseService.getTicketsBySeller(sellerId);
       } catch (err) {
-        console.warn('Supabase getTicketsBySeller failed, falling back to mock:', err);
+        console.warn('Supabase getTicketsBySeller failed, gracefully downgrading engine to MOCK_LOCAL:', err);
+        activeEngine = 'MOCK_LOCAL';
       }
     }
     return mockApi.getTicketsBySeller(sellerId);
@@ -162,7 +173,8 @@ export const dbApi = {
       try {
         return await supabaseService.getPurchases();
       } catch (err) {
-        console.warn('Supabase getPurchases failed, falling back to mock:', err);
+        console.warn('Supabase getPurchases failed, gracefully downgrading engine to MOCK_LOCAL:', err);
+        activeEngine = 'MOCK_LOCAL';
       }
     }
     return mockApi.getPurchases();

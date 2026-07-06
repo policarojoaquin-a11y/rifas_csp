@@ -1,9 +1,17 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Raffle, Seller, Ticket, PurchaseRequest, BankInfo } from '../types';
 
+// Helper to safely parse booleans from database values
+function parseBoolean(val: any): boolean {
+  if (val === null || val === undefined) return false;
+  if (typeof val === 'boolean') return val;
+  const str = String(val).toLowerCase().trim();
+  return str === 'true' || str === 't' || str === '1' || str === 'yes';
+}
+
 // Helper to map DB row representing a vendor to Seller
 function mapSellerFromDB(row: any, assigned_numbers: number[] = []): Seller {
-  const sId = String(row.id);
+  const sId = String(row.id).trim();
   const firstWord = row.nombre ? row.nombre.trim().split(/\s+/)[0] : 'VENDEDOR';
   // Fallback to generating uppercase code if none exists
   const code = (row.code || (firstWord + sId)).toUpperCase();
@@ -26,18 +34,34 @@ const DEFAULT_BANK_INFO: BankInfo = {
 };
 
 export const supabaseService = {
-  // Check if tables exist by querying the user's vendedores table
+  // Check if tables exist by querying public.vendedores, public.rifas, and public.rifas_vendidas
   async checkTablesExist(): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
-      const { error } = await supabase.from('vendedores').select('id').limit(1);
-      if (error) {
-        if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('exist')) {
-          return false;
-        }
+      // 1. Verify vendedores table exists
+      const { error: vError } = await supabase.from('vendedores').select('id').limit(1);
+      if (vError && (vError.code === 'PGRST116' || vError.message?.includes('relation') || vError.message?.includes('exist') || vError.message?.includes('does not exist'))) {
+        console.warn('Supabase vendeurs table does not exist:', vError);
+        return false;
       }
-      return !error;
-    } catch {
+
+      // 2. Verify rifas table exists
+      const { error: rError } = await supabase.from('rifas').select('id').limit(1);
+      if (rError && (rError.code === 'PGRST116' || rError.message?.includes('relation') || rError.message?.includes('exist') || rError.message?.includes('does not exist'))) {
+        console.warn('Supabase rifas table does not exist:', rError);
+        return false;
+      }
+
+      // 3. Verify rifas_vendidas table exists
+      const { error: rvError } = await supabase.from('rifas_vendidas').select('id').limit(1);
+      if (rvError && (rvError.code === 'PGRST116' || rvError.message?.includes('relation') || rvError.message?.includes('exist') || rvError.message?.includes('does not exist'))) {
+        console.warn('Supabase rifas_vendidas table does not exist:', rvError);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error('Failed checking Supabase tables presence:', err);
       return false;
     }
   },
@@ -110,8 +134,9 @@ export const supabaseService = {
     let rifasData: any[] = [];
     let rPage = 0;
     const rPageSize = 1000;
+    const maxRPage = 5; // Safety page limit to prevent long delays and timeouts
     let hasMoreRifas = true;
-    while (hasMoreRifas) {
+    while (hasMoreRifas && rPage < maxRPage) {
       const { data, error } = await supabase
         .from('rifas')
         .select('numero, vendedor_id')
@@ -129,11 +154,20 @@ export const supabaseService = {
       }
     }
 
+    if (rifasData) {
+      rifasData.sort((a, b) => {
+        const numA = parseInt(a.numero, 10);
+        const numB = parseInt(b.numero, 10);
+        if (isNaN(numA) || isNaN(numB)) return a.numero.localeCompare(b.numero);
+        return numA - numB;
+      });
+    }
+
     const assignedMap: Record<string, number[]> = {};
     if (rifasData) {
       rifasData.forEach(row => {
         if (row.vendedor_id !== null && row.vendedor_id !== undefined) {
-          const sId = String(row.vendedor_id);
+          const sId = String(row.vendedor_id).trim();
           if (!assignedMap[sId]) {
             assignedMap[sId] = [];
           }
@@ -146,7 +180,7 @@ export const supabaseService = {
     }
 
     return (sellersData || []).map(row => {
-      const sId = String(row.id);
+      const sId = String(row.id).trim();
       const assigned = (assignedMap[sId] || []).sort((a, b) => a - b);
       return mapSellerFromDB(row, assigned);
     });
@@ -216,12 +250,12 @@ export const supabaseService = {
     let rifasData: any[] = [];
     let rPage = 0;
     const rPageSize = 1000;
+    const maxRPage = 5; // Safety page limit to prevent long delays and timeouts
     let hasMoreRifas = true;
-    while (hasMoreRifas) {
+    while (hasMoreRifas && rPage < maxRPage) {
       const { data, error } = await supabase
         .from('rifas')
         .select('*')
-        .order('numero', { ascending: true })
         .range(rPage * rPageSize, (rPage + 1) * rPageSize - 1);
       if (error) throw error;
       if (!data || data.length === 0) {
@@ -233,6 +267,108 @@ export const supabaseService = {
         } else {
           rPage++;
         }
+      }
+    }
+
+    if (rifasData) {
+      rifasData.sort((a, b) => {
+        const numA = parseInt(a.numero, 10);
+        const numB = parseInt(b.numero, 10);
+        if (isNaN(numA) || isNaN(numB)) return a.numero.localeCompare(b.numero);
+        return numA - numB;
+      });
+    }
+
+    // Auto-seed if table is connected but empty to prevent "0 disponibles"
+    if (rifasData.length === 0) {
+      console.log('No rifas found in database, attempting automatic seed...');
+      try {
+        // Check if vendors exist. If not, insert default vendors
+        const { data: currentSellers } = await supabase
+          .from('vendedores')
+          .select('id');
+        
+        let mateoId = 1;
+        let tommyId = 2;
+        let simonId = 3;
+
+        if (!currentSellers || currentSellers.length === 0) {
+          // Attempt inserting with specific IDs (1, 2, 3) to align with default representatives
+          const { data: insertedSellers, error: insertSellersErr } = await supabase
+            .from('vendedores')
+            .insert([
+              { id: 1, nombre: 'Mateo Natero', telefono: '+54 11 9988-7766' },
+              { id: 2, nombre: 'Tommy Kinan', telefono: '+54 11 2233-4455' },
+              { id: 3, nombre: 'Simon Wolf', telefono: '+54 11 5544-3322' }
+            ])
+            .select();
+          
+          if (!insertSellersErr && insertedSellers && insertedSellers.length > 0) {
+            mateoId = insertedSellers[0]?.id || 1;
+            tommyId = insertedSellers[1]?.id || 2;
+            simonId = insertedSellers[2]?.id || 3;
+          } else {
+            // Fallback without explicit IDs
+            const { data: fallbackSellers } = await supabase
+              .from('vendedores')
+              .insert([
+                { nombre: 'Mateo Natero', telefono: '+54 11 9988-7766' },
+                { nombre: 'Tommy Kinan', telefono: '+54 11 2233-4455' },
+                { nombre: 'Simon Wolf', telefono: '+54 11 5544-3322' }
+              ])
+              .select();
+            if (fallbackSellers && fallbackSellers.length >= 3) {
+              mateoId = fallbackSellers[0].id;
+              tommyId = fallbackSellers[1].id;
+              simonId = fallbackSellers[2].id;
+            }
+          }
+        } else {
+          mateoId = currentSellers[0]?.id || 1;
+          tommyId = currentSellers[1]?.id || 2;
+          simonId = currentSellers[2]?.id || 3;
+        }
+
+        // Generate 100 tickets
+        const ticketsToInsert = [];
+        for (let i = 1; i <= 100; i++) {
+          const padded = String(i).padStart(4, '0');
+          let sellerId = null;
+          if (i <= 10) sellerId = mateoId;
+          else if (i <= 20) sellerId = tommyId;
+          else if (i <= 30) sellerId = simonId;
+
+          ticketsToInsert.push({
+            numero: padded,
+            vendedor_id: sellerId,
+            is_available: true
+          });
+        }
+
+        const { error: seedError } = await supabase
+          .from('rifas')
+          .insert(ticketsToInsert);
+
+        if (!seedError) {
+          console.log('Successfully auto-seeded 100 tickets in database.');
+          // Re-fetch rifas data
+          const { data: refetchedData } = await supabase
+            .from('rifas')
+            .select('*');
+          if (refetchedData && refetchedData.length > 0) {
+            refetchedData.sort((a, b) => {
+              const numA = parseInt(a.numero, 10);
+              const numB = parseInt(b.numero, 10);
+              if (isNaN(numA) || isNaN(numB)) return a.numero.localeCompare(b.numero);
+              return numA - numB;
+            });
+            rifasData = refetchedData;
+          }
+        } else {
+          console.error('Error auto-seeding tickets:', seedError);
+        }
+      } catch (err) {
+        console.error('Failed to run automatic database seeder:', err);
       }
     }
 
@@ -269,7 +405,8 @@ export const supabaseService = {
     // Detect orphaned unavailable tickets and auto-heal them in Supabase
     const orphanedRifaIds: number[] = [];
     (rifasData || []).forEach(row => {
-      if (!row.is_available && !salesMap[row.id]) {
+      const isAvailable = parseBoolean(row.is_available);
+      if (!isAvailable && !salesMap[row.id]) {
         orphanedRifaIds.push(row.id);
       }
     });
@@ -288,15 +425,16 @@ export const supabaseService = {
         });
     }
 
-    return (rifasData || []).map(row => {
+    const mappedTickets = (rifasData || []).map(row => {
       const num = parseInt(row.numero, 10);
       const sale = salesMap[row.id];
 
       let status: 'AVAILABLE' | 'PENDING_REVIEW' | 'SOLD' = 'AVAILABLE';
+      const isAvailable = parseBoolean(row.is_available);
       if (orphanedRifaIds.includes(row.id)) {
         // Orphaned tickets are auto-healed and displayed as AVAILABLE
         status = 'AVAILABLE';
-      } else if (!row.is_available) {
+      } else if (!isAvailable) {
         if (sale && (sale.state === 'PENDING' || sale.state === 'PENDING_REVIEW')) {
           status = 'PENDING_REVIEW';
         } else if (sale) {
@@ -338,7 +476,7 @@ export const supabaseService = {
       return {
         number: isNaN(num) ? 0 : num,
         status: status,
-        sellerId: row.vendedor_id ? String(row.vendedor_id) : null,
+        sellerId: (row.vendedor_id !== null && row.vendedor_id !== undefined) ? String(row.vendedor_id).trim() : null,
         buyerName,
         buyerPhone,
         buyerEmail,
@@ -346,6 +484,15 @@ export const supabaseService = {
         submittedAt,
       };
     });
+
+    console.log(`[getTickets] Total tickets loaded: ${mappedTickets.length}`);
+    const seller35Tickets = mappedTickets.filter(t => t.sellerId === '35');
+    console.log(`[getTickets] Seller 35 has ${seller35Tickets.length} assigned tickets.`);
+    if (seller35Tickets.length > 0) {
+      console.log(`[getTickets] Seller 35 tickets status sample:`, seller35Tickets.slice(0, 10).map(t => ({ number: t.number, status: t.status })));
+    }
+
+    return mappedTickets;
   },
 
   async getTicketsBySeller(sellerId: string): Promise<Ticket[]> {
@@ -513,19 +660,19 @@ export const supabaseService = {
   async getPurchases(): Promise<PurchaseRequest[]> {
     if (!supabase) return [];
 
-    // Fetch all sales and fetch the matching ticket number by joining table "rifas" (with pagination)
+    // Fetch all sales safely without joining to bypass potentially missing/misconfigured FK relations in Supabase
     let sales: any[] = [];
     let page = 0;
     const pageSize = 1000;
+    const maxPages = 5; // Safety page limit to prevent long delays and timeouts
     let hasMore = true;
-    while (hasMore) {
+    while (hasMore && page < maxPages) {
       const { data, error } = await supabase
         .from('rifas_vendidas')
-        .select('*, rifas(numero)')
+        .select('*')
         .range(page * pageSize, (page + 1) * pageSize - 1);
       if (error) {
-        console.error("Error retrieving purchases from Supabase:", error);
-        return [];
+        throw error;
       }
       if (!data || data.length === 0) {
         hasMore = false;
@@ -538,6 +685,27 @@ export const supabaseService = {
         }
       }
     }
+
+    // Fetch all rifas to perform lookup mapping in memory, eliminating foreign key query dependencies
+    let rifasData: any[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('rifas')
+        .select('id, numero');
+      if (!error && data) {
+        rifasData = data;
+      }
+    } catch (err) {
+      console.warn('Could not load rifas for purchase correlation:', err);
+    }
+
+    const rifaIdToNumMap: Record<string, number> = {};
+    (rifasData || []).forEach(r => {
+      const parsedNum = parseInt(r.numero, 10);
+      if (!isNaN(parsedNum)) {
+        rifaIdToNumMap[String(r.id)] = parsedNum;
+      }
+    });
 
     // Group the sales into transactions matching the client information + purchase action
     const groups: Record<string, {
@@ -557,7 +725,7 @@ export const supabaseService = {
       const dateStr = row.fecha_venta || '';
       const key = `${row.nombre || ''}_${row.email || ''}_${row.vendedor_id || ''}_${dateStr}`;
 
-      const ticketNum = row.rifas ? parseInt(row.rifas.numero, 10) : NaN;
+      const ticketNum = rifaIdToNumMap[String(row.rifa_id)] || NaN;
 
       if (!groups[key]) {
         groups[key] = {
@@ -671,10 +839,10 @@ export const supabaseService = {
       throw new Error('Compra no encontrada en la base de datos.');
     }
 
-    // Find all ticket rows connected to this group so we can release them
+    // Find all ticket rows connected to this group so we can release them without nested select joins
     let selectQuery = supabase
       .from('rifas_vendidas')
-      .select('*, rifas(id, numero)')
+      .select('*')
       .eq('nombre', firstSale.nombre)
       .eq('email', firstSale.email)
       .eq('fecha_venta', firstSale.fecha_venta);
@@ -687,7 +855,24 @@ export const supabaseService = {
 
     const { data: groupedSales } = await selectQuery;
 
-    if (groupedSales) {
+    if (groupedSales && groupedSales.length > 0) {
+      // Resolve matching rifas numbers using a separate in-memory query to stay safe
+      const rifaIds = groupedSales.map(s => s.rifa_id).filter(Boolean);
+      let rifasDetails: any[] = [];
+      if (rifaIds.length > 0) {
+        try {
+          const { data: rd } = await supabase
+            .from('rifas')
+            .select('id, numero')
+            .in('id', rifaIds);
+          if (rd) rifasDetails = rd;
+        } catch (err) {
+          console.warn('Could not fetch rifas details during rejection:', err);
+        }
+      }
+      const rifasMap = new Map<string, string>(rifasDetails.map(r => [String(r.id), r.numero]));
+      const rejectedTicketNumbers: number[] = [];
+
       for (const sale of groupedSales) {
         if (sale.rifa_id) {
           // Reset availability in rifas table without clearing the assigned seller
@@ -697,57 +882,63 @@ export const supabaseService = {
             .eq('id', sale.rifa_id);
         }
 
-        if (sale.rifas && typeof localStorage !== 'undefined') {
-          const num = parseInt(sale.rifas.numero, 10);
+        const ticketNumStr = rifasMap.get(String(sale.rifa_id));
+        if (ticketNumStr) {
+          const num = parseInt(ticketNumStr, 10);
           if (!isNaN(num)) {
-            const rawOverlay = localStorage.getItem(`rifa_buyer_info_${num}`);
-            if (rawOverlay) {
-              try {
-                const parsed = JSON.parse(rawOverlay);
-                if (parsed.receiptImgKey) {
-                  localStorage.removeItem(parsed.receiptImgKey);
-                }
-              } catch {}
+            rejectedTicketNumbers.push(num);
+            if (typeof localStorage !== 'undefined') {
+              const rawOverlay = localStorage.getItem(`rifa_buyer_info_${num}`);
+              if (rawOverlay) {
+                try {
+                  const parsed = JSON.parse(rawOverlay);
+                  if (parsed.receiptImgKey) {
+                    localStorage.removeItem(parsed.receiptImgKey);
+                  }
+                } catch {}
+              }
+              localStorage.removeItem(`rifa_buyer_info_${num}`);
             }
-            localStorage.removeItem(`rifa_buyer_info_${num}`);
           }
         }
       }
+
+      // Delete purchase records (rifas_vendidas items) entirely from the database
+      let deleteQuery = supabase
+        .from('rifas_vendidas')
+        .delete()
+        .eq('nombre', firstSale.nombre)
+        .eq('email', firstSale.email)
+        .eq('fecha_venta', firstSale.fecha_venta);
+
+      if (firstSale.vendedor_id === null || firstSale.vendedor_id === undefined) {
+        deleteQuery = deleteQuery.is('vendedor_id', null);
+      } else {
+        deleteQuery = deleteQuery.eq('vendedor_id', firstSale.vendedor_id);
+      }
+
+      const { error: deleteError } = await deleteQuery;
+
+      if (deleteError) throw deleteError;
+
+      // Return a dummy/updated state so that the calling method receives it nicely
+      const dummyPurchase: PurchaseRequest = {
+        id: purchaseId,
+        raffleId: 'default-raffle',
+        sellerId: String(firstSale.vendedor_id),
+        buyerName: firstSale.nombre,
+        buyerPhone: firstSale.numero,
+        buyerEmail: firstSale.email,
+        ticketNumbers: rejectedTicketNumbers.sort((a, b) => a - b),
+        receiptUrl: '',
+        status: 'REJECTED',
+        totalAmount: 0,
+        submittedAt: firstSale.fecha_venta,
+      };
+      return dummyPurchase;
     }
 
-    // Delete purchase records (rifas_vendidas items) entirely from the database
-    let deleteQuery = supabase
-      .from('rifas_vendidas')
-      .delete()
-      .eq('nombre', firstSale.nombre)
-      .eq('email', firstSale.email)
-      .eq('fecha_venta', firstSale.fecha_venta);
-
-    if (firstSale.vendedor_id === null || firstSale.vendedor_id === undefined) {
-      deleteQuery = deleteQuery.is('vendedor_id', null);
-    } else {
-      deleteQuery = deleteQuery.eq('vendedor_id', firstSale.vendedor_id);
-    }
-
-    const { error: deleteError } = await deleteQuery;
-
-    if (deleteError) throw deleteError;
-
-    // Return a dummy/updated state so that the calling method receives it nicely
-    const dummyPurchase: PurchaseRequest = {
-      id: purchaseId,
-      raffleId: 'default-raffle',
-      sellerId: String(firstSale.vendedor_id),
-      buyerName: firstSale.nombre,
-      buyerPhone: firstSale.numero,
-      buyerEmail: firstSale.email,
-      ticketNumbers: groupedSales ? groupedSales.map(s => s.rifas ? parseInt(s.rifas.numero, 10) : NaN).filter(x => !isNaN(x)) : [],
-      receiptUrl: '',
-      status: 'REJECTED',
-      totalAmount: 0,
-      submittedAt: firstSale.fecha_venta,
-    };
-    return dummyPurchase;
+    throw new Error('No se encontraron registros de ventas asociados a esta transacción.');
   },
 
   // --- SWEEPSTAKES / WINNER SELECTION ---

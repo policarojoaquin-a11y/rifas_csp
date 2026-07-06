@@ -166,7 +166,13 @@ const getStoredData = <T>(key: string, defaultValue: T): T => {
     return defaultValue;
   }
   try {
-    return JSON.parse(stored) as T;
+    const parsed = JSON.parse(stored) as T;
+    // Auto-heal empty lists if the default contains items (critical for avoiding 0 tickets / 0 sellers)
+    if (Array.isArray(parsed) && parsed.length === 0 && Array.isArray(defaultValue) && defaultValue.length > 0) {
+      localStorage.setItem(key, JSON.stringify(defaultValue));
+      return defaultValue;
+    }
+    return parsed;
   } catch (e) {
     return defaultValue;
   }

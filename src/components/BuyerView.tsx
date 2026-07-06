@@ -105,6 +105,32 @@ export default function BuyerView({
   } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Diagnostic logging
+  useEffect(() => {
+    console.log('[BuyerView DIAGNOSTICS] Sellers loaded:', sellers.length);
+    console.log('[BuyerView DIAGNOSTICS] Tickets loaded:', tickets.length);
+    const seller35 = sellers.find(s => String(s.id).trim() === '35');
+    if (seller35) {
+      console.log('[BuyerView DIAGNOSTICS] Seller 35 found:', seller35.name, 'assigned numbers count:', seller35.assignedNumbers.length);
+    } else {
+      console.log('[BuyerView DIAGNOSTICS] Seller 35 NOT found in sellers prop!');
+    }
+    const s35Tickets = tickets.filter(t => t.sellerId ? String(t.sellerId).trim() === '35' : false);
+    console.log('[BuyerView DIAGNOSTICS] Tickets filtered for seller 35 count:', s35Tickets.length);
+    if (s35Tickets.length > 0) {
+      console.log('[BuyerView DIAGNOSTICS] Sample tickets for seller 35:', s35Tickets.slice(0, 5).map(t => ({ num: t.number, status: t.status })));
+    }
+  }, [sellers, tickets]);
+
+  const [dbErrorMsg, setDbErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).__lastDbError) {
+      const err = (window as any).__lastDbError;
+      setDbErrorMsg(err.message || String(err));
+    }
+  }, []);
+
   // Search and Pagination states for sellers list
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -298,13 +324,27 @@ export default function BuyerView({
   // Calculate Total cost dynamically
   const computedTotal = selectedNumbers.length * raffle.ticketPrice;
 
-  // Filter tickets that belong to the currently selected Seller and are in is_available = TRUE (mapped as AVAILABLE)
+  // Filter tickets that belong to the currently selected Seller
   const sellerTickets = selectedSeller 
-    ? tickets.filter(t => t.sellerId === selectedSeller.id && t.status === 'AVAILABLE')
+    ? tickets.filter(t => {
+        const tSellerId = t.sellerId ? String(t.sellerId).trim() : '';
+        const selId = selectedSeller.id ? String(selectedSeller.id).trim() : '';
+        return tSellerId === selId;
+      })
     : [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {dbErrorMsg && (
+        <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+            <span><strong>Error de Base de Datos (Supabase):</strong> {dbErrorMsg}. El sistema ha activado el simulador local de contingencia.</span>
+          </div>
+          <button onClick={() => setDbErrorMsg(null)} className="text-rose-600 hover:text-rose-800 font-bold ml-2">Cerrar</button>
+        </div>
+      )}
+
       {/* Raffle Info Banner */}
       <section className="relative mb-10 overflow-hidden rounded-3xl bg-radial from-slate-900 to-slate-800 px-6 py-10 text-white shadow-xl sm:px-12 sm:py-14">
         {/* Decorative graphic element */}
@@ -450,9 +490,11 @@ export default function BuyerView({
                   const isSelected = selectedSeller?.id === seller.id;
                   
                   // Compute available ticket counts on the fly
-                  const availableAssignedCount = tickets.filter(
-                    t => t.sellerId === seller.id && t.status === 'AVAILABLE'
-                  ).length;
+                  const availableAssignedCount = tickets.filter(t => {
+                    const tSellerId = t.sellerId ? String(t.sellerId).trim() : '';
+                    const selId = seller.id ? String(seller.id).trim() : '';
+                    return tSellerId === selId && t.status === 'AVAILABLE';
+                  }).length;
 
                   return (
                     <button

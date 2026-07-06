@@ -55,5 +55,12 @@ const supabaseAnonKey = parsed.key;
 export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey && (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'));
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        storage: typeof window !== 'undefined' ? window.sessionStorage : undefined
+      }
+    })
   : null;
