@@ -32,10 +32,12 @@ export default function App() {
       const activeEng = await determineActiveEngine();
       setEngine(activeEng);
 
-      const activeRaffle = await dbApi.getActiveRaffle();
-      const loadedSellers = await dbApi.getSellers();
-      const loadedTickets = await dbApi.getTickets();
-      const loadedPurchases = await dbApi.getPurchases();
+      const [activeRaffle, loadedSellers, loadedTickets, loadedPurchases] = await Promise.all([
+        dbApi.getActiveRaffle(),
+        dbApi.getSellers(),
+        dbApi.getTickets(),
+        dbApi.getPurchases(),
+      ]);
 
       setRaffle(activeRaffle);
       setSellers(loadedSellers);

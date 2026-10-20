@@ -29,6 +29,7 @@ import {
   Copy
 } from 'lucide-react';
 import { Raffle, Seller, Ticket, PurchaseRequest, BankInfo } from '../types';
+import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from '../services/supabaseClient';
 
 interface AdminViewProps {
   raffle: Raffle;
@@ -67,6 +68,8 @@ export default function AdminView({
   dbEngine = 'MOCK_LOCAL',
   onReloadDb
 }: AdminViewProps) {
+
+  const isSupabase = dbEngine === 'SUPABASE_CONNECTED' || isSupabaseConfigured;
 
   // Login State
   const [emailInput, setEmailInput] = useState('');
@@ -238,7 +241,12 @@ export default function AdminView({
       setNewSellerCode('');
       setNewSellerNumbersRaw('');
     } catch (err: any) {
-      setSellerFormError(err.message || 'Error al guardar vendedor.');
+      const msg = err?.message || 'Error al guardar vendedor.';
+      if (msg.includes('row-level security') || msg.includes('42501')) {
+        setSellerFormError('Error de permisos en Supabase (RLS): Ejecuta en el SQL Editor de Supabase: ALTER TABLE public.vendedores DISABLE ROW LEVEL SECURITY; para permitir registrar vendedores.');
+      } else {
+        setSellerFormError(msg);
+      }
     }
   };
 
@@ -437,8 +445,6 @@ export default function AdminView({
 
   // Render Login state first if not logged in
   if (!isLoggedIn) {
-    const isSupabase = dbEngine === 'SUPABASE_CONNECTED';
-
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <motion.div
@@ -871,8 +877,39 @@ export default function AdminView({
 
       {/* TAB CONTENT: SELLERS */}
       {activeTab === 'sellers' && (
-        <div className="space-y-8">
-          
+        <div className="space-y-6">
+          {/* Supabase Status Banner */}
+          {isSupabase && (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white font-bold">
+                  <Database className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Conexión a Supabase Activa ({sellers.length} vendedores en tabla public.vendedores)
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {sellers.length === 0 
+                      ? 'Tu base de datos está conectada pero la tabla public.vendedores no tiene registros aún. Registra tus vendedores con el formulario de abajo o insertándolos en Supabase.'
+                      : `Actualmente hay ${sellers.length} vendedores registrados en tu base de datos Supabase.`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`ALTER TABLE public.vendedores DISABLE ROW LEVEL SECURITY;\nALTER TABLE public.rifas DISABLE ROW LEVEL SECURITY;\nALTER TABLE public.rifas_vendidas DISABLE ROW LEVEL SECURITY;`);
+                  alert('Comando SQL copiado al portapapeles. Pégalo en el SQL Editor de Supabase.');
+                }}
+                className="shrink-0 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 cursor-pointer transition-all flex items-center gap-1.5 shadow-xs"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copiar SQL para RLS
+              </button>
+            </div>
+          )}
+
           {/* Bento grids showing quick forms & assign features */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
@@ -1403,25 +1440,56 @@ export default function AdminView({
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">VITE_SUPABASE_URL</span>
-                  {import.meta.env.VITE_SUPABASE_URL ? (
-                    <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm">Configurado</span>
+                  {supabaseUrl ? (
+                    <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm">Conectado</span>
                   ) : (
                     <span className="font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-sm">Falta</span>
                   )}
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">VITE_SUPABASE_ANON_KEY</span>
-                  {import.meta.env.VITE_SUPABASE_ANON_KEY ? (
+                  {supabaseAnonKey ? (
                     <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm">Configurado</span>
                   ) : (
                     <span className="font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-sm">Falta</span>
                   )}
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-100 pt-2">
-                Configura estas variables en el panel de <strong>Secrets / Configuración</strong> del editor en la zona superior de AI Studio.
+              <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-100 pt-2 truncate font-mono">
+                {supabaseUrl || 'Sin URL configurada'}
               </p>
             </div>
+          </div>
+
+          {/* Database Tables Reference Card */}
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-sky-600" />
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Tablas que llama la Base de Datos (PostgreSQL en Supabase)</h4>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                <span className="font-mono font-bold text-sky-700 block">1. public.vendedores</span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Lista de los representantes/vendedores del sorteo. Columnas: <code className="bg-slate-100 px-1 rounded text-[10px]">id</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">nombre</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">telefono</code>.
+                </p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                <span className="font-mono font-bold text-sky-700 block">2. public.rifas</span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Catálogo de números (0001 a 0100) y su vendedor asignado. Columnas: <code className="bg-slate-100 px-1 rounded text-[10px]">numero</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">vendedor_id</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">is_available</code>.
+                </p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                <span className="font-mono font-bold text-sky-700 block">3. public.rifas_vendidas</span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Historial de compras, reservas y comprobantes de pago. Columnas: <code className="bg-slate-100 px-1 rounded text-[10px]">rifa_id</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">nombre</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">numero</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">comprobante</code>, <code className="bg-slate-100 px-1 rounded text-[10px]">state</code>.
+                </p>
+              </div>
+            </div>
+            <p className="text-[11px] text-amber-900 bg-amber-50 p-2.5 rounded-lg border border-amber-200 leading-relaxed">
+              ⚠️ <strong>Importante sobre Row Level Security (RLS):</strong> Si al conectar a Supabase no ves los vendedores ni los números, es porque Supabase tiene RLS activo por defecto y no hay políticas para la clave pública (anon). Ejecuta el script SQL de abajo en tu Supabase SQL Editor para desactivar RLS o dar permisos y poblar las tablas inmediatamente.
+            </p>
           </div>
 
           {/* Setup steps guide */}
@@ -1549,57 +1617,28 @@ CREATE TABLE IF NOT EXISTS public.rifas_vendidas (
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- 5. Insertar vendedores predeterminados
-INSERT INTO public.vendedores (id, nombre, telefono)
-VALUES 
-(1, 'Mateo Natero', '+54 11 9988-7766'),
-(2, 'Tommy Kinan', '+54 11 2233-4455'),
-(3, 'Simon Wolf', '+54 11 5544-3322')
-ON CONFLICT (id) DO NOTHING;
-
--- Ajustar secuencia para ids autoincrementales después de inserción manual
-SELECT setval(pg_get_serial_sequence('public.vendedores', 'id'), coalesce(max(id), 1)) FROM public.vendedores;
-
--- 6. Insertar 100 números de rifas iniciales y asignarle vendedor correspondiente
+-- 5. Insertar los 100 números de rifas (0001 al 0100) listos para la venta
 DO $$
 DECLARE
     i INTEGER;
     padded TEXT;
-    v_seller_id INTEGER;
 BEGIN
     FOR i IN 1..100 LOOP
         padded := LPAD(i::text, 4, '0');
-        
-        -- Asignar los primeros 10 a Mateo (id: 1), 11-20 a Tommy (id: 2), 21-30 a Simon (id: 3)
-        IF i <= 10 THEN
-            v_seller_id := 1;
-        ELSIF i <= 20 THEN
-            v_seller_id := 2;
-        ELSIF i <= 30 THEN
-            v_seller_id := 3;
-        ELSE
-            v_seller_id := NULL;
-        END IF;
-
         INSERT INTO public.rifas (numero, vendedor_id, is_available)
-        VALUES (padded, v_seller_id, TRUE)
+        VALUES (padded, NULL, TRUE)
         ON CONFLICT (numero) DO NOTHING;
     END LOOP;
 END $$;
 
--- 7. Insertar compras iniciales de prueba (pendiente, aprobadas, etc.)
-INSERT INTO public.rifas_vendidas (rifa_id, vendedor_id, nombre, numero, email, fecha_venta, state)
-VALUES
--- El número 7 comprado por Mateo Natero (aprobado), asignado a id 1 (Mateo)
-((SELECT id FROM public.rifas WHERE numero = '0007' LIMIT 1), 1, 'Mateo Natero', '+54 11 9988-7766', 'mateo.natero@gmail.com', NOW() - INTERVAL '2 days', 'APPROVED'),
--- El número 14 comprado por Tommy Kinan (aprobado), asignado a id 2 (Tommy)
-((SELECT id FROM public.rifas WHERE numero = '0014' LIMIT 1), 2, 'Tommy Kinan', '+54 11 2233-4455', 'tommykinan2002@gmail.com', NOW() - INTERVAL '1 day', 'APPROVED'),
--- El número 21 comprado por Simon Wolf (pendiente), asignado a id 3 (Simon)
-((SELECT id FROM public.rifas WHERE numero = '0021' LIMIT 1), 3, 'Simon Wolf', '+54 11 5544-3322', 'simon.wolf@gmail.com', NOW() - INTERVAL '15 minutes', 'PENDING_REVIEW');
-
--- 8. DESACTIVAR LA SEGURIDAD DE FILA (RLS) para permitir el modo administrador e interactividad en vivo de demostración
+-- 6. DESACTIVAR LA SEGURIDAD DE FILA (RLS) para permitir que la aplicación web funcione conectada a Supabase
 ALTER TABLE public.vendedores DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rifas DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rifas_vendidas DISABLE ROW LEVEL SECURITY;
+
+-- 7. (Opcional) Si deseas registrar tus vendedores directamente desde SQL, descomenta y adapta esta línea:
+-- INSERT INTO public.vendedores (nombre, telefono) VALUES 
+-- ('Juan Pérez', '+54 9 11 1234-5678'),
+-- ('María Gómez', '+54 9 11 8765-4321');
 `;
 

@@ -40,16 +40,24 @@ function parseComplexEnv(val1: string, val2: string): { url: string; key: string
   return { url: finalUrl, key: finalKey };
 }
 
-const rawUrl = (typeof import.meta !== 'undefined' && import.meta.env)
-  ? (import.meta.env.VITE_SUPABASE_URL || '')
-  : (process.env.VITE_SUPABASE_URL || '');
-const rawKey = (typeof import.meta !== 'undefined' && import.meta.env)
-  ? (import.meta.env.VITE_SUPABASE_ANON_KEY || '')
-  : (process.env.VITE_SUPABASE_ANON_KEY || '');
+const FALLBACK_SUPABASE_URL = 'https://xqikzccsnzelpumevmxo.supabase.co';
+const FALLBACK_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxaWt6Y2NzbnplbHB1bWV2bXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NzA5NzUsImV4cCI6MjA5MjQ0Njk3NX0.bTwBIxc6bxkw4XNiucH6xRIHlw_HWbLvBHnl88DCx-s';
+
+const rawUrl = ((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL)
+  ? import.meta.env.VITE_SUPABASE_URL
+  : (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL)
+  ? process.env.VITE_SUPABASE_URL
+  : '') || FALLBACK_SUPABASE_URL;
+
+const rawKey = ((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY)
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY
+  : (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY)
+  ? process.env.VITE_SUPABASE_ANON_KEY
+  : '') || FALLBACK_SUPABASE_ANON_KEY;
 
 const parsed = parseComplexEnv(rawUrl, rawKey);
-const supabaseUrl = parsed.url;
-const supabaseAnonKey = parsed.key;
+export const supabaseUrl = parsed.url;
+export const supabaseAnonKey = parsed.key;
 
 // Verify it's not empty and starts with http/https
 export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey && (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'));

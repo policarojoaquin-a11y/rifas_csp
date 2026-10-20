@@ -46,16 +46,17 @@ import {
 import { Raffle, Seller, Ticket, TicketStatus } from '../types';
 
 const RAFFLE_PRIZES = [
-  'Heladera BGH con Dispenser',
-  'Smart TV 50" Enova',
-  'Microondas Samsung 23" Silver',
-  'Barra de Sonido Samsung',
-  'Minipimer Midea',
-  'Licuadora KitchenAid',
-  'Tostadora KitchenAid',
-  'Procesadora KitchenAid',
-  'Parlante XBoom LG',
-  'Termo K2 1 Litro'
+  'Aire Acondicionado Split Frío/Calor',
+  'Cava Philco 28 Botellas',
+  'Parlante Smartlife',
+  'Parlante House of Marley',
+  'Cama Elástica',
+  'Aspiradora Daihatsu D-AS 400',
+  'Freidora de Aire Midea 11 Lts',
+  'Monopatín Eléctrico Daihatsu',
+  'Espumador de Leche Daihatsu',
+  'Tacho de Basura Automático',
+  'Monitor Gamer'
 ];
 
 // Zod Validation Schema
@@ -135,6 +136,8 @@ export default function BuyerView({
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+  const [searchTab, setSearchTab] = useState<'vendedor' | 'numero'>('vendedor');
+  const [numberSearchQuery, setNumberSearchQuery] = useState('');
 
   // Reset pagination page when search changes
   useEffect(() => {
@@ -280,7 +283,7 @@ export default function BuyerView({
 
   // Form submission
   const onSubmit = async (data: PurchaseFormData) => {
-    if (!selectedSeller) {
+    if (!selectedSeller && sellers.length > 0 && searchTab === 'vendedor') {
       setFormError('Debe seleccionar un vendedor antes de enviar.');
       return;
     }
@@ -293,9 +296,12 @@ export default function BuyerView({
       setFormError(null);
       const totalPrice = selectedNumbers.length * raffle.ticketPrice;
       
+      // If no seller selected, find if the chosen ticket has an assigned seller, or use general
+      const ticketSellerId = selectedSeller?.id || tickets.find(t => selectedNumbers.includes(t.number))?.sellerId || '';
+
       await onSubmitPurchase({
         raffleId: raffle.id,
-        sellerId: selectedSeller.id,
+        sellerId: ticketSellerId || 'general',
         buyerName: data.buyerName,
         buyerPhone: data.buyerPhone,
         buyerEmail: data.buyerEmail,
@@ -427,7 +433,7 @@ export default function BuyerView({
               Bases y Condiciones del Sorteo
             </h4>
             <p className="text-xs sm:text-sm text-slate-605 text-slate-600 font-medium leading-relaxed">
-              El sorteo se realizará el día <strong className="text-slate-950 font-bold">Lunes 6 de Julio</strong> por la <strong className="text-slate-950 font-bold">Quiniela Nacional Nocturna</strong>, tomando las últimas 4 cifras del 1° al 12° premio. En caso de que el número sorteado no haya sido vendido, se tomará el siguiente premio en orden. En caso de no realizarse el sorteo ese día, se pasará al próximo sorteo de la Quiniela Nacional. Los premios no son transferibles ni canjeables por dinero.
+              El sorteo se realizará el día <strong className="text-slate-950 font-bold">Lunes 6 de Julio</strong> por la <strong className="text-slate-950 font-bold">Quiniela Nacional Nocturna</strong>, tomando las últimas 4 cifras del 1° al 11° premio. En caso de que el número sorteado no haya sido vendido, se tomará el siguiente premio en orden. En caso de no realizarse el sorteo ese día, se pasará al próximo sorteo de la Quiniela Nacional. Los premios no son transferibles ni canjeables por dinero.
             </p>
             <p className="mt-2 text-xs sm:text-sm font-bold text-sky-700 flex items-center gap-1">
               ¡Gracias por colaborar! 🙌
@@ -444,123 +450,334 @@ export default function BuyerView({
           <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
             <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 border-b border-slate-100 pb-4 mb-4">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700 text-sm font-bold">1</span>
-              Seleccioná un Vendedor Asociado
+              Seleccioná un Vendedor Asociado o Número
             </h3>
-            <p className="text-sm text-slate-500 mb-4 font-normal">
-              Las rifas se asignan a vendedores individuales. Seleccioná el tuyo para ver sus números disponibles.
-            </p>
 
-            {/* SELLER SEARCH INPUT */}
-            <div className="relative mb-5">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Buscar vendedor por nombre..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 text-sm placeholder-slate-400 text-slate-800 transition-all font-sans"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-                  title="Limpiar búsqueda"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
+            {/* TABS SELECTOR */}
+            <div className="flex border-b border-slate-100 mb-5 pb-1">
+              <button
+                type="button"
+                onClick={() => setSearchTab('vendedor')}
+                className={`flex-1 text-center pb-2.5 text-xs sm:text-sm font-semibold transition-all border-b-2 cursor-pointer ${
+                  searchTab === 'vendedor'
+                    ? 'border-sky-505 border-sky-500 text-sky-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                👤 Buscar por Vendedor
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchTab('numero')}
+                className={`flex-1 text-center pb-2.5 text-xs sm:text-sm font-semibold transition-all border-b-2 cursor-pointer ${
+                  searchTab === 'numero'
+                    ? 'border-sky-505 border-sky-500 text-sky-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                🎟️ Buscar por Número
+              </button>
             </div>
 
-            {/* SELLERS CONTROLLER GRID */}
-            {paginatedSellers.length === 0 ? (
-              <div className="text-center py-6 border border-slate-100 rounded-xl bg-slate-50/50">
-                <p className="text-sm text-slate-500">No se encontraron vendedores con el nombre "<strong className="text-slate-700">{searchQuery}</strong>".</p>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="mt-2 text-xs font-bold text-sky-600 hover:text-sky-700 underline"
-                >
-                  Ver todos los representantes
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {paginatedSellers.map((seller) => {
-                  const isSelected = selectedSeller?.id === seller.id;
-                  
-                  // Compute available ticket counts on the fly
-                  const availableAssignedCount = tickets.filter(t => {
-                    const tSellerId = t.sellerId ? String(t.sellerId).trim() : '';
-                    const selId = seller.id ? String(seller.id).trim() : '';
-                    return tSellerId === selId && t.status === 'AVAILABLE';
-                  }).length;
+            {searchTab === 'vendedor' ? (
+              sellers.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/50 p-6 text-center space-y-3 my-2">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div className="max-w-md mx-auto">
+                    <h4 className="text-sm font-bold text-slate-900">Base de datos conectada: Sin vendedores registrados</h4>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      La base de datos de Supabase está conectada con éxito, pero la tabla <strong>public.vendedores</strong> está vacía actualmente. Puedes seleccionar y comprar números directamente en la pestaña <strong>"Buscar por Número"</strong> o registrar a tus vendedores en el panel de Administrador.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSearchTab('numero')}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2 text-xs font-bold text-white shadow-xs cursor-pointer transition-all"
+                    >
+                      🎟️ Ver y elegir números directamente
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-500 mb-4 font-normal">
+                    Las rifas se asignan a vendedores individuales. Seleccioná el tuyo para ver sus números disponibles.
+                  </p>
+
+                  {/* SELLER SEARCH INPUT */}
+                  <div className="relative mb-5">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Buscar vendedor por nombre..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-9 py-2 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 text-sm placeholder-slate-400 text-slate-800 transition-all font-sans"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* SELLERS CONTROLLER GRID */}
+                  {paginatedSellers.length === 0 ? (
+                    <div className="text-center py-6 border border-slate-100 rounded-xl bg-slate-50/50">
+                      <p className="text-sm text-slate-500">No se encontraron vendedores con el nombre "<strong className="text-slate-700">{searchQuery}</strong>".</p>
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="mt-2 text-xs font-bold text-sky-600 hover:text-sky-700 underline"
+                      >
+                        Ver todos los representantes
+                      </button>
+                    </div>
+                  ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {paginatedSellers.map((seller) => {
+                      const isSelected = selectedSeller?.id === seller.id;
+                      
+                      // Compute available ticket counts on the fly
+                      const availableAssignedTickets = tickets.filter(t => {
+                        const tSellerId = t.sellerId ? String(t.sellerId).trim() : '';
+                        const selId = seller.id ? String(seller.id).trim() : '';
+                        return tSellerId === selId && t.status === 'AVAILABLE';
+                      });
+                      const availableAssignedCount = availableAssignedTickets.length;
+                      const availableNumbersList = availableAssignedTickets
+                        .map(t => t.number)
+                        .sort((a, b) => a - b);
+
+                      return (
+                        <button
+                          key={seller.id}
+                          type="button"
+                          onClick={() => handleSelectSeller(seller)}
+                          className={`relative flex items-start gap-3 rounded-xl border p-4 text-left transition-all duration-200 cursor-pointer ${
+                            isSelected
+                              ? 'border-sky-500 bg-sky-50/50 ring-2 ring-sky-500/15 shadow-sm'
+                              : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/30'
+                          }`}
+                        >
+                          {/* Initials badge replacing code ID to prevent overlapping overflow */}
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-sm select-none transition-all ${
+                            isSelected ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {getInitials(seller.name)}
+                          </div>
+                          <div className="flex-1 min-w-0 pr-2">
+                            <h4 className="text-sm font-semibold text-slate-900 truncate subtitle-fit">{seller.name}</h4>
+                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                              <Users className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span className="truncate">
+                                {availableAssignedCount} disp. / {seller.assignedNumbers.length} tot.
+                              </span>
+                            </div>
+                            {availableNumbersList.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 mt-2.5">
+                                {availableNumbersList.slice(0, 4).map(num => (
+                                  <span key={num} className="inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-mono font-bold border border-sky-100/50">
+                                    {String(num).padStart(4, '0')}
+                                  </span>
+                                ))}
+                                {availableNumbersList.length > 4 && (
+                                  <span className="inline-flex items-center px-1 py-0.5 rounded bg-slate-50 text-slate-500 text-[9px] font-bold border border-slate-100">
+                                    +{availableNumbersList.length - 4}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-rose-500 font-semibold mt-1.5">Sin números disponibles</p>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <div className="absolute top-3 right-3 text-sky-600">
+                              <CheckCircle2 className="h-5 w-5 fill-sky-50" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* SELLER PAGINATION COMPONENT */}
+                {filteredSellers.length > itemsPerPage && (
+                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                    >
+                      <ChevronLeft className="h-4.5 w-4.5" />
+                      <span>Anterior</span>
+                    </button>
+                    
+                    <span className="text-xs font-medium text-slate-500">
+                      Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
+                    </span>
+
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                    >
+                      <span>Siguiente</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )) : (
+              <div className="space-y-4">
+                <p className="text-xs sm:text-sm text-slate-500 font-normal">
+                  Ingresá el número de rifa que buscás para verificar su disponibilidad y qué vendedor lo tiene asignado.
+                </p>
+
+                {/* NUMBER SEARCH INPUT */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-slate-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Escribí un número de rifa (ej. 5, 45, 0072)..."
+                    value={numberSearchQuery}
+                    onChange={(e) => setNumberSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-9 py-2 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10 text-sm placeholder-slate-400 text-slate-800 transition-all font-mono"
+                  />
+                  {numberSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setNumberSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* SEARCH RESULTS OR FULL DIRECTORY GRID */}
+                {(() => {
+                  const query = numberSearchQuery.trim();
+                  // Filter tickets matching search query
+                  const matches = tickets.filter(t => {
+                    if (!query) return true; // Show all available if no query is typed!
+                    const paddedNum = String(t.number).padStart(4, '0');
+                    const numStr = String(t.number);
+                    return paddedNum.includes(query) || numStr.includes(query);
+                  });
+
+                  // If searching but no matches
+                  if (query && matches.length === 0) {
+                    return (
+                      <div className="text-center py-6 border border-slate-100 rounded-xl bg-slate-50/50">
+                        <p className="text-sm text-slate-500">
+                          No se encontró la rifa número "<strong className="text-slate-700">{query}</strong>".
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  // To prevent cluttering, if there is no query, we can list the first 12 available tickets.
+                  const displayedMatches = query ? matches : matches.filter(t => t.status === 'AVAILABLE').slice(0, 12);
 
                   return (
-                    <button
-                      key={seller.id}
-                      type="button"
-                      onClick={() => handleSelectSeller(seller)}
-                      className={`relative flex items-center gap-3 rounded-xl border p-4 text-left transition-all duration-200 cursor-pointer ${
-                        isSelected
-                          ? 'border-sky-500 bg-sky-50/50 ring-2 ring-sky-500/15 shadow-sm'
-                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/30'
-                      }`}
-                    >
-                      {/* Initials badge replacing code ID to prevent overlapping overflow */}
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-sm select-none transition-all ${
-                        isSelected ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-650 text-slate-600'
-                      }`}>
-                        {getInitials(seller.name)}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          {query ? `Coincidencias (${matches.length})` : 'Sugerencias de Números Libres'}
+                        </span>
+                        {!query && (
+                          <span className="text-[10px] text-slate-400">Mostrando {displayedMatches.length} de {matches.filter(t => t.status === 'AVAILABLE').length} disponibles</span>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0 pr-2">
-                        <h4 className="text-sm font-semibold text-slate-900 truncate subtitle-fit">{seller.name}</h4>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                          <Users className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">
-                            {availableAssignedCount} disp. / {seller.assignedNumbers.length} tot.
-                          </span>
-                        </div>
+
+                      <div className="max-h-72 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100 pr-1">
+                        {displayedMatches.map(t => {
+                          // Find corresponding seller
+                          const sId = t.sellerId ? String(t.sellerId).trim() : '';
+                          const tSeller = sellers.find(s => String(s.id).trim() === sId);
+
+                          let statusLabel = 'Disponible';
+                          let statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                          if (t.status === 'PENDING_REVIEW') {
+                            statusLabel = 'En revisión';
+                            statusColor = 'bg-amber-50 text-amber-700 border-amber-100';
+                          } else if (t.status === 'SOLD') {
+                            statusLabel = 'Vendido';
+                            statusColor = 'bg-slate-50 text-slate-500 border-slate-100';
+                          }
+
+                          const isSelected = selectedNumbers.includes(t.number);
+
+                          return (
+                            <div key={t.number} className="flex items-center justify-between p-3 hover:bg-slate-50/50 transition-all">
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex h-9 w-14 items-center justify-center rounded-lg bg-slate-950 text-white font-mono text-sm font-bold shadow-xs">
+                                  {String(t.number).padStart(4, '0')}
+                                </span>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-semibold text-slate-800">
+                                      {tSeller ? tSeller.name : 'Sin Vendedor Asignado'}
+                                    </span>
+                                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold border ${statusColor}`}>
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">
+                                    {tSeller ? `Rifas asignadas a este vendedor` : 'Se asignará al vendedor que elijas'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {t.status === 'AVAILABLE' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (tSeller) {
+                                      setSelectedSeller(tSeller);
+                                    }
+                                    
+                                    // Toggle number selection
+                                    setSelectedNumbers(prev => {
+                                      if (prev.includes(t.number)) {
+                                        return prev.filter(n => n !== t.number);
+                                      } else {
+                                        return [...prev, t.number].sort((a, b) => a - b);
+                                      }
+                                    });
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:border-sky-500 hover:text-sky-600'
+                                  }`}
+                                >
+                                  {isSelected ? '✓ Seleccionado' : 'Elegir'}
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 font-medium select-none pr-3">No disponible</span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                      {isSelected && (
-                        <div className="absolute top-3 right-3 text-sky-600">
-                          <CheckCircle2 className="h-5 w-5 fill-sky-50" />
-                        </div>
-                      )}
-                    </button>
+                    </div>
                   );
-                })}
-              </div>
-            )}
-
-            {/* SELLER PAGINATION COMPONENT */}
-            {filteredSellers.length > itemsPerPage && (
-              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <button
-                  type="button"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                >
-                  <ChevronLeft className="h-4.5 w-4.5" />
-                  <span>Anterior</span>
-                </button>
-                
-                <span className="text-xs font-medium text-slate-500">
-                  Página <strong>{currentPage}</strong> de <strong>{totalPages}</strong>
-                </span>
-
-                <button
-                  type="button"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition-all hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                >
-                  <span>Siguiente</span>
-                  <ChevronRight className="h-4.5 w-4.5" />
-                </button>
+                })()}
               </div>
             )}
           </section>

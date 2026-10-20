@@ -25,6 +25,17 @@ try {
     localStorage.removeItem(STORAGE_KEYS.TICKETS);
     localStorage.removeItem(STORAGE_KEYS.PURCHASES);
   }
+
+  // Update cached raffle price if it was 15000
+  if (currentRaffle) {
+    try {
+      const parsedRaffle = JSON.parse(currentRaffle);
+      if (parsedRaffle.ticketPrice === 15000) {
+        parsedRaffle.ticketPrice = 10000;
+        localStorage.setItem(STORAGE_KEYS.RAFFLE, JSON.stringify(parsedRaffle));
+      }
+    } catch {}
+  }
 } catch (e) {
   console.warn('LocalStorage migration error', e);
 }
@@ -44,7 +55,7 @@ const DEFAULT_RAFFLE: Raffle = {
   id: 'raffle-1',
   title: 'Rifa Gira de Rugby a Sudáfrica - Club San Patricio',
   description: 'Participá de la rifa benéfica oficial del Club San Patricio. Todo lo recaudado será destinado a financiar la gira de rugby a Sudáfrica 2027.',
-  ticketPrice: 15000,
+  ticketPrice: 10000,
   totalTickets: 100, // 100 tickets in our pool for demonstration ease
   bankInfo: DEFAULT_BANK_INFO,
   status: 'ACTIVE',
