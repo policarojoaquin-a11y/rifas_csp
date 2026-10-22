@@ -432,8 +432,8 @@ export default function BuyerView({
             <h4 className="text-sm font-bold text-slate-900 mb-1.5">
               Bases y Condiciones del Sorteo
             </h4>
-            <p className="text-xs sm:text-sm text-slate-605 text-slate-600 font-medium leading-relaxed">
-              El sorteo se realizará el día <strong className="text-slate-950 font-bold">Lunes 6 de Julio</strong> por la <strong className="text-slate-950 font-bold">Quiniela Nacional Nocturna</strong>, tomando las últimas 4 cifras del 1° al 11° premio. En caso de que el número sorteado no haya sido vendido, se tomará el siguiente premio en orden. En caso de no realizarse el sorteo ese día, se pasará al próximo sorteo de la Quiniela Nacional. Los premios no son transferibles ni canjeables por dinero.
+            <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
+              El sorteo se realizará el día <strong className="text-slate-950 font-bold">Jueves 3 de Diciembre</strong> por la <strong className="text-slate-950 font-bold">Quiniela Nacional Nocturna</strong>, tomando las <strong className="text-slate-950 font-bold">últimas 3 cifras</strong> del 1° al 11° premio. En caso de que el número sorteado no haya sido vendido, se tomará el siguiente premio en orden. En caso de no realizarse el sorteo ese día, se pasará al próximo sorteo de la Quiniela Nacional. Los premios no son transferibles ni canjeables por dinero.
             </p>
             <p className="mt-2 text-xs sm:text-sm font-bold text-sky-700 flex items-center gap-1">
               ¡Gracias por colaborar! 🙌
@@ -587,7 +587,7 @@ export default function BuyerView({
                               <div className="flex flex-wrap gap-1 mt-2.5">
                                 {availableNumbersList.slice(0, 4).map(num => (
                                   <span key={num} className="inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-mono font-bold border border-sky-100/50">
-                                    {String(num).padStart(4, '0')}
+                                    {String(num).padStart(raffle.totalTickets > 999 ? 4 : 3, '0')}
                                   </span>
                                 ))}
                                 {availableNumbersList.length > 4 && (
@@ -671,10 +671,11 @@ export default function BuyerView({
                 {/* SEARCH RESULTS OR FULL DIRECTORY GRID */}
                 {(() => {
                   const query = numberSearchQuery.trim();
+                  const padLen = raffle.totalTickets > 999 ? 4 : 3;
                   // Filter tickets matching search query
                   const matches = tickets.filter(t => {
                     if (!query) return true; // Show all available if no query is typed!
-                    const paddedNum = String(t.number).padStart(4, '0');
+                    const paddedNum = String(t.number).padStart(padLen, '0');
                     const numStr = String(t.number);
                     return paddedNum.includes(query) || numStr.includes(query);
                   });
@@ -726,7 +727,7 @@ export default function BuyerView({
                             <div key={t.number} className="flex items-center justify-between p-3 hover:bg-slate-50/50 transition-all">
                               <div className="flex items-center gap-3">
                                 <span className="inline-flex h-9 w-14 items-center justify-center rounded-lg bg-slate-950 text-white font-mono text-sm font-bold shadow-xs">
-                                  {String(t.number).padStart(4, '0')}
+                                  {String(t.number).padStart(raffle.totalTickets > 999 ? 4 : 3, '0')}
                                 </span>
                                 <div>
                                   <div className="flex items-center gap-1.5">
@@ -886,7 +887,7 @@ export default function BuyerView({
                     <p className="text-xs text-slate-500">Números elegidos</p>
                     <p className="text-sm font-bold text-slate-800">
                       {selectedNumbers.length > 0 
-                        ? selectedNumbers.join(', ') 
+                        ? selectedNumbers.map(n => String(n).padStart(raffle.totalTickets > 999 ? 4 : 3, '0')).join(', ') 
                         : 'Ninguno seleccionado'}
                     </p>
                   </div>
