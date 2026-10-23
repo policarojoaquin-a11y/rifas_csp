@@ -1,15 +1,19 @@
-name: Deploy to Hostinger
+name: Build y publicar en rama deploy
 
 on:
   push:
     branches:
-      - main # Cambia esto a master si tu rama principal se llama master
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -18,17 +22,18 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Instalar dependencias
         run: npm ci
 
-      - name: Build Application
+      - name: Build
         run: npm run build
 
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      # Publica SOLO el contenido de dist/ (incluye .htaccess) en la rama "deploy".
+      # Hostinger -> GIT debe apuntar a la rama "deploy".
+      - name: Publicar dist en rama deploy
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: public_html/ # Dirección destino en Hostinger (suele ser public_html/)
-          local-dir: ./dist/
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: deploy
+          publish_dir: ./dist
+          force_orphan: true
